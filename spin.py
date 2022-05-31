@@ -1,11 +1,9 @@
-import argparse
 import os
 import sys
 from pathlib import Path
 
-import torch
-import torch.backends.cudnn as cudnn
 import numpy as np
+import torch
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -14,12 +12,9 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from models.common import DetectMultiBackend
-from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
-from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
-from utils.plots import Annotator, colors, save_one_box
-from utils.torch_utils import select_device, time_sync
 from utils.augmentations import letterbox
+from utils.general import check_img_size, cv2, non_max_suppression, scale_coords
+from utils.torch_utils import select_device
 
 
 def load_image(image_info, path, img_size, stride, auto):
@@ -52,7 +47,6 @@ def get_image_info_blocking():
 @torch.no_grad
 def run(
     weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
-    source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
     data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
     conf_thres=0.25,  # confidence threshold
     iou_thres=0.45,  # NMS IOU threshold
@@ -75,12 +69,11 @@ def run(
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     
     # Dataloader
-    dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
     bs = 1  # batch_size
     
     # Run inference loop
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
-    dt, seen = [0.0, 0.0, 0.0], 0
+    seen = 0
     while True:
         try:
             # Get the image info
@@ -102,10 +95,9 @@ def run(
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             
             # Process predictions
-            for i, det in enumerate(pred):  # per image
+            for det in pred:  # per image
                 seen += 1
                 im0 = im0s.copy()
-                gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
                 if len(det):
                     # Rescale boxes from img_size to im0 size
                     det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
